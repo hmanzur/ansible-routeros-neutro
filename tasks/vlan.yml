@@ -1,0 +1,67 @@
+- name: Setup VLANs Facts For {{ item.name }}
+  ansible.builtin.set_fact:
+    segment: "{{ (10 * idx) + 10 }}"
+    address: "{{ vlan.prefix }}.{{ (10 * idx) + 10 }}.1/24"
+    interface: "{{ item.interface | default(vlan.interface) }}"
+
+- name: Set Pool Facts For {{ item.name }}
+  ansible.builtin.set_fact:
+    pool_name: "{{ item.name }}-pool"
+    pool_range: "{{ vlan.prefix }}.{{ segment }}.100-{{ vlan.prefix }}.{{ segment }}.200"
+
+- name: Init VLAN {{ item.name }}
+  when: ansible_debug | default(false)
+  ansible.builtin.debug:
+    msg: "Creating {{ item.name }} with id {{ segment }} in the address {{ address }} for interface"
+
+- name: Add VLAN Interface ID {{ segment }}
+  community.routeros.command:
+    commands:
+      - >
+        /interface vlan add
+        name={{ item.name }}
+        vlan-id={{ segment }}
+        interface={{ interface }}
+        comment="ansible: {{ item.name }}"
+
+- name: Assign IP address to VLAN interface {{ item.name }}
+  community.routeros.command:
+    commands:
+      - "/ip address add address={{ address }} interface={{ item.name }} comment=\"ansible: {{ item.name }} gateway\""
+
+- name: Tag VLAN {{ item.name }}
+  community.routeros.command:
+    commands:
+      - >
+        /interface bridge vlan add
+        bridge=bridge-home
+        vlan-ids={{ segment }}
+        tagged=bridge-home
+        untagged={{ item.untagged_interfaces | default([]) | join(',') }}
+        comment="ansible: VLAN {{ item.name }}"
+
+- name: Add DHCP Network For {{ item.name }}
+  community.routeros.command:
+    commands:
+      - >
+          /ip dhcp-server network add
+          address="{{ vlan.prefix }}.{{ segment }}.0/24"
+          gateway="{{ vlan.prefix }}.{{ segment }}.1"
+          dns-server="{{ item.dns | default(vlan.dns) }}"
+          comment="ansible: {{ item.name }}"
+
+- name: Add DHCP Pool for {{ item.name }}
+  community.routeros.command:
+    commands:
+      - "/ip pool add name={{ item.name }}-dhcp ranges={{ pool_range }} comment=\"ansible: {{ item.name }}\""
+      - /ip dhcp-server add address-pool={{ item.name }}-dhcp interface={{ item.name }} name={{ item.name }}-dhcp disabled=no
+
+- name: Add NAT rule for {{ item.name }}
+  community.routeros.command:
+    commands:
+      - >
+        /ip firewall nat add
+        chain=srcnat
+        action=masquerade
+        src-address={{ vlan.prefix }}.{{ segment }}.0/24
+        comment="ansible: {{ item.name }} nat rule"

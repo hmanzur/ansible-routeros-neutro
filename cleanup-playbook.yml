@@ -1,0 +1,49 @@
+- name: Reset MikroTik to factory defaults
+  hosts: mikrotik
+  gather_facts: false
+  tasks:
+    - name: Reset RouterOS configuration to factory defaults
+      community.routeros.command:
+        commands:
+          - /system reset-configuration no-default=no skip-backup=yes
+      failed_when: false
+
+- name: Wait for MikroTik SSH and add to known_hosts
+  hosts: localhost
+  gather_facts: false
+  vars:
+    mikrotik_ip: "192.168.88.1"
+    mikrotik_port: 22
+    mikrotik_password: "{{ lookup('env', 'MIKROTIK_SSH_PASSWORD') }}"
+    home_dir: "{{ lookup('env','HOME') }}"
+  tasks:
+    - name: Remove old SSH key for MikroTik from local known_hosts
+      ansible.builtin.known_hosts:
+        path: "{{ home_dir }}/.ssh/known_hosts"
+        name: "{{ mikrotik_ip }}"
+        state: absent
+
+    - name: Wait for MikroTik to be reachable via SSH
+      ansible.builtin.wait_for:
+        host: "{{ mikrotik_ip }}"
+        port: "{{ mikrotik_port }}"
+        timeout: 120
+        delay: 10
+        state: started
+        msg: "MikroTik is not responding on SSH port {{ mikrotik_port }} after timeout"
+
+    - name: Add MikroTik to known_hosts
+      ansible.builtin.known_hosts:
+        name: "{{ mikrotik_ip }}"
+        key: "{{ lookup('pipe', 'ssh-keyscan -t rsa ' + mikrotik_ip) }}"
+        path: "{{ home_dir }}/.ssh/known_hosts"
+        state: present
+
+    - name: Connect to MikroTik via SSH
+      ansible.builtin.expect:
+        command: ssh -o StrictHostKeyChecking=no admin@{{ mikrotik_ip }}
+        responses:
+          'Do you want to see the software license? [Y/n]: ': 'Y'
+          'assword:': ''
+          'Please set a password:': '{{ mikrotik_password }}'
+          'Confirm password:': '{{ mikrotik_password }}'

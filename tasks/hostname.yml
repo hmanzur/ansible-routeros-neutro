@@ -1,0 +1,17 @@
+- name: Set Facts for {{ hostname }}
+  ansible.builtin.set_fact:
+    auto_ip: "192.168.{{ 10 * (vlan | int) + 10 }}.{{ idx + 100 }}"
+
+- name: Set Address for {{ hostname }}
+  ansible.builtin.set_fact:
+    final_ip: "{{ address | default(auto_ip, true) }}"
+
+- name: Add DHCP Server Lease For {{ hostname }}
+  community.routeros.command:
+    commands:
+      - "/ip dhcp-server lease add address={{ final_ip }} mac-address={{ mac }} comment=\"ansible: {{ hostname }}.lan to {{ mac }}\""
+
+- name: Add DNS Static Address to {{ final_ip }}
+  community.routeros.command:
+    commands:
+      - "/ip dns static add name={{ hostname }}.lan address={{ final_ip }} comment=\"Ansible Builtin DNS {{ hostname }} to {{ mac }}\""

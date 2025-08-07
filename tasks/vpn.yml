@@ -1,0 +1,29 @@
+- name: Create OVPN Server
+  community.routeros.command:
+    commands:
+      - >
+        /interface ovpn-server server set
+        enabled=yes
+        comment="Ansible Builtin OVPN Server"
+
+- name: Create PPP Secret
+  community.routeros.command:
+    commands:
+      - >
+        /ppp secret add
+        name={{ user }}
+        password={{ pass }}
+        service=ovpn
+        profile=default-encryption
+        comment="Ansible Builtin VPN User"
+
+- name: Create Firewall Filter
+  community.routeros.command:
+    commands:
+      - >
+        /ip firewall filter add
+        chain=input
+        protocol=tcp
+        dst-port=1194
+        action=accept
+        comment="Ansible Builtin Allow OVPN Port"

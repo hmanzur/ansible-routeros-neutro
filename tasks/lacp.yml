@@ -1,0 +1,26 @@
+- name: Remove Port Interfaces
+  community.routeros.command:
+    commands:
+      - /interface bridge port remove [find interface={{ item }}]
+  loop: "{{ ports }}"
+
+- name: Bond Interface {{ bridge }}
+  community.routeros.command:
+    commands:
+      - >
+        /interface bonding add bridge={{ interface }} mode={{ mode }} slaves={{ ports | join(",") }}
+        transmit-hash-policy=layer-2-and-3 comment="ansible: lacp"
+
+- name: Add Interface Bridge To {{ bridge }}
+  community.routeros.command:
+    commands:
+      - >
+        /interface bridge add bridge={{ bridge }}
+        comment="ansible: lacp"
+
+- name: Bridge Port to {{ interface }}
+  community.routeros.command:
+    commands:
+      - >
+        /interface bridge port add bridge={{ bridge }} interface={{ interface }}
+        comment="ansible: lacp"

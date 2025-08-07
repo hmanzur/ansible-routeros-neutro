@@ -1,0 +1,126 @@
+- name: RouterOS Setup
+  hosts: mikrotik
+  gather_facts: false
+
+  pre_tasks:
+    - name: Gather system resources
+      community.routeros.command:
+        commands:
+          - /system resource print
+      register: system_resource_print
+
+    - name: Show system resources
+      ansible.builtin.debug:
+        var: system_resource_print.stdout_lines
+
+  tasks:
+    - name: Configure WAN
+      community.routeros.command:
+        commands:
+          - '/interface vlan add name=wan vlan-id=200 interface=ether1 comment="ansible: WAN VLAN 200"'
+          - '/ip dhcp-client add interface=wan disabled=no comment="ansible: DHCP client on WAN"'
+
+    - name: Show WAN configuration
+      community.routeros.command:
+        commands:
+          - '/ip dhcp-client print detail'
+      register: wan_config
+
+    - name: Display WAN configuration
+      ansible.builtin.debug:
+        var: wan_config.stdout_lines
+
+    - name: Enable NAT Masquerade
+      community.routeros.command:
+        commands:
+          - '/ip firewall nat add chain=srcnat out-interface=wan action=masquerade comment="ansible: NAT for WAN"'
+
+    - name: Configure DNS servers
+      community.routeros.command:
+        commands:
+          - /ip dns set servers=1.1.1.1,1.0.0.1 allow-remote-requests=yes
+
+    # - name: Cleanup default DHCP config
+    #   community.routeros.command:
+    #     commands:
+    #       - /ip dhcp-server remove [find]
+    #       - /ip dhcp-server network remove [find]
+    #       - /ip pool remove [find where ranges~"192.168.88."]
+
+    # - name: Configure mgmt interface
+    #   when: mgmt.enabled
+    #   community.routeros.command:
+    #     commands:
+    #       - /interface ethernet set [find default-name={{ mgmt.port }}] name=mgmt comment="ansible: mgmt"
+    #       - /ip address add address={{ mgmt.ip }} interface=mgmt comment="ansible: mgmt IP"
+
+    # - name: Restrict services to mgmt subnet
+    #   when: mgmt.enabled
+    #   community.routeros.command:
+    #     commands:
+    #       - /ip service set [find name=winbox] address={{ mgmt.ip.split('/')[0] ~ '/24' }}
+    #       - /ip service set [find name=ssh] address={{ mgmt.ip.split('/')[0] ~ '/24' }}
+    #       - /ip service set [find name=www] address={{ mgmt.ip.split('/')[0] ~ '/24' }}
+
+    # - name: Create LAN bridge
+    #   when: lan.enabled
+    #   community.routeros.command:
+    #     commands:
+    #       - /interface bridge add name=lan-bridge comment="ansible: LAN bridge"
+
+    # - name: Add LAN ports to bridge
+    #   when: lan.enabled
+    #   loop: "{{ lan.ports }}"
+    #   loop_control:
+    #     loop_var: lan_port
+    #   community.routeros.command:
+    #     commands:
+    #       - /interface bridge port add interface={{ lan_port }} bridge=lan-bridge
+
+    # - name: Assign LAN IP to bridge
+    #   when: lan.enabled
+    #   community.routeros.command:
+    #     commands:
+    #       - /ip address add address={{ lan.ip }} interface=lan-bridge comment="ansible: LAN IP"
+
+    # - name: Configure DHCP for LAN
+    #   when: lan.enabled
+    #   community.routeros.command:
+    #     commands:
+    #       - /ip pool add name=dhcp_pool_lan ranges={{ lan.dhcp.pool }}
+    #       - >
+    #         /ip dhcp-server network add
+    #         address={{ lan.ip.split('/')[0] ~ '/24' }}
+    #         gateway={{ lan.ip.split('/')[0] }}
+    #         dns-server={{ lan.dhcp.dns }}
+    #       - >
+    #         /ip dhcp-server add name=dhcp_lan
+    #         interface=lan-bridge
+    #         address-pool=dhcp_pool_lan
+    #         disabled=no
+
+    # - name: NAT for mgmt subnet
+    #   when: mgmt.enabled and wan.enabled
+    #   loop: "{{ wan.ports }}"
+    #   loop_control:
+    #     loop_var: wan_port
+    #   community.routeros.command:
+    #     commands:
+    #       - >
+    #         /ip firewall nat add chain=srcnat
+    #         src-address={{ mgmt.ip.split('/')[0] ~ '/24' }}
+    #         out-interface={{ wan_port }}
+    #         action=masquerade comment="ansible: NAT mgmt via {{ wan_port }}"
+
+    # - name: NAT for LAN subnet
+    #   when: lan.enabled and wan.enabled
+    #   loop: "{{ wan.ports }}"
+    #   loop_control:
+    #     loop_var: wan_port
+    #   community.routeros.command:
+    #     commands:
+    #       - >
+    #         /ip firewall nat add chain=srcnat
+    #         src-address={{ lan.ip.split('/')[0] ~ '/24' }}
+    #         out-interface={{ wan_port }}
+    #         action=masquerade comment="ansible: NAT LAN via {{ wan_port }}"

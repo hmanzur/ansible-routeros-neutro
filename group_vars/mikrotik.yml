@@ -1,0 +1,54 @@
+ansible_user: "{{ lookup('env', 'ANSIBLE_MIKROTIK_USER') }}"
+ansible_ssh_pass: "{{ lookup('env', 'ANSIBLE_MIKROTIK_PASS') }}"
+ansible_debug: "{{ lookup('env', 'ANSIBLE_DEBUG') | default(false) }}"
+
+network:
+  gateway: "192.168.10.1"
+  ip: "192.168.{}.{}"
+  mask: 24
+  dns: "1.1.1.1,1.0.0.1"
+  leases:
+    - mac: "F0:2F:74:1D:C7:71"
+      vlan: "admin"
+      hostname: "pneuma"
+
+wan:
+  enabled: true
+  ports:
+    - ether1
+    - ether2
+
+lan:
+  enabled: true
+  ports:
+    - ether3
+    - ether4
+    - ether6
+    - ether7
+    - ether8
+  ip: "10.10.10.1/24"
+  dhcp:
+    pool: "10.10.10.100-10.10.10.200"
+    dns: "1.1.1.1,8.8.8.8"
+
+mgmt:
+  enabled: true
+  ports:
+    - ether5
+  ip: "192.168.88.1/24"
+
+vlan:
+  enabled: false
+  prefix: "192.168"
+  interface: "home-bridge"
+  items:
+    - name: "admin"
+    - name: "iot"
+      dns: "1.1.1.2,1.0.0.2"
+
+lacp:
+  enabled: false
+  mode: "802.3ad"
+  slaves:
+    - ether1
+    - ether2

@@ -1,0 +1,5 @@
+{
+  "ansible.python.interpreterPath": "/home/hmanzur/projects/ansible-routeros-neutro/.direnv/python-3.11.2/bin/python",
+  "python-envs.defaultEnvManager": "ms-python.python:system",
+  "python-envs.pythonProjects": []
+}
